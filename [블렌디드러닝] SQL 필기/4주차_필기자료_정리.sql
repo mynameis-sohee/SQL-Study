@@ -135,3 +135,126 @@ inner join (
 on c.course_id = c2.course_id 
 
 
+## [두 걸음 더] WITH 
+# subquery할 테이블들을, with를 이용해 alias 처럼 임시 테이블을 생성
+# 위 '[한걸음 더] 퍼센트 나타내기'와 결과값은 똑같이 나옴
+
+with table1 as (
+	select course_id, count(distinct(user_id)) as cnt_checkins 
+	from checkins
+	group by course_id
+), table2 as (
+	select course_id, count(user_id) as cnt_total from orders
+	group by course_id
+)
+
+select c2.title,
+	   c.cnt_checkins,
+	   o.cnt_total,
+	   c.cnt_checkins/o.cnt_total as ratio
+from  table1 c
+inner join table2 o
+on c.course_id = o.course_id
+inner join (
+	select * from courses
+) c2
+on c.course_id = c2.course_id 
+
+
+
+# 실전에서 유용한 SQL 문법 (문자열)
+# 문자열 다뤄보기- 문자열 쪼개기
+select user_id, email, SUBSTRING_INDEX(email, '@', 1) from users u # 뒤에 것을 출력하려면 -1
+
+# 일자 쪼개기
+select order_no, created_at, SUBSTRING(created_at, 1, 10) from orders o # 시작포인트(1-1포함), 10개까지만 출력.
+
+# 일별 주문이 몇개 들어왔는지 계산해보기
+
+select SUBSTRING(created_at,1,10) as created_date, count(*) from orders
+group by created_date
+
+# 이거 에러나는데 왜 안되는지 찾아놓기
+select SUBSTRING(created_at,1,10) as created_date, count(created_date) from orders
+group by created_date
+
+
+
+# 실전에서 유용한 SQL 문법 (Case)
+# 조건에 맞게 출력하도록 한다.
+select substring(user_id,1,2) as user_id_보안처리, 
+	   (case when pu.point > 10000 then '잘하고 있다!'
+	  		 when pu.point > 15000 then '그저 그렇다'
+	  		 else '조금 더 화이팅'
+	  		 end) as msg
+from point_users pu
+
+# 실전에서 유용한 SQL 문법 (Case)
+# 위의 테이블을 subquery 화 한다.
+
+with table1 as (
+	select substring(user_id,1,2) as user_id_보안처리, 
+		   (case when pu.point > 10000 then '잘하고 있다!'
+		  		 when pu.point > 15000 then '그저 그렇다'
+		  		 else '조금 더 화이팅'
+		  		 end) as msg
+	from point_users pu
+)
+
+select msg, count(*) from table1
+group by msg
+
+
+# 퀴즈 1 - 평균 이상 포인트를 갖고 있으면 '잘 하고 있어요'/ 낮으면 '열심히 합시다!' 표시하기 : 질문 폭탄
+select pu.point_user_id, pu.point,
+	   (case when pu.point > (select avg(point) from point_users) then '잘 하고 있어요'
+	   else '열심히 합시다!' end) as msg
+from point_users pu 
+
+
+# 퀴즈 2 - 이메일 도메인 별 유저의 수 세어보기
+# select 에서 지정된 값이 group by보다 먼저 처리된다.
+select SUBSTRING_INDEX(email, '@', -1) as domain, 
+	   count(*) as cnt 
+from users u 
+group by domain
+
+
+# 퀴즈 3 - '화이팅'이 포함된 오늘의 다짐만 출력해보기
+show tables
+
+select * from checkins c 
+where comment like '%화이팅%'
+
+
+# 퀴즈 4 - 수강등록정보(enrolled_id) 별 전체 강의 수와 들은 강의의 수 출력해보기
+
+with table1 as (
+	select enrolled_id, count(*) as total_cnt from enrolleds_detail
+	group by enrolled_id)
+, table2 as (
+	select enrolled_id, count(*) as done_cnt from enrolleds_detail
+	where done = 1
+	group by enrolled_id)	
+	
+select a.enrolled_id, b.done_cnt, a.total_cnt from table1 a
+inner join table2 b
+on a.enrolled_id = b.enrolled_id
+
+
+
+# 퀴즈 5 - 수강등록정보(enrolled_id) 별 전체 강의 수와 들은 강의의 수, 그리고 진도율 출력해보기
+with table1 as (
+	select enrolled_id, count(*) as total_cnt from enrolleds_detail
+	group by enrolled_id)
+, table2 as (
+	select enrolled_id, count(*) as done_cnt from enrolleds_detail
+	where done = 1
+	group by enrolled_id)	
+	
+select a.enrolled_id, b.done_cnt, a.total_cnt, round(done_cnt/total_cnt,2) as ratio from table1 a
+inner join table2 b
+on a.enrolled_id = b.enrolled_id
+
+
+
